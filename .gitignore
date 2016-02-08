@@ -1,3 +1,8 @@
 pemextest.csv
 .gitignore
 .~lock*
+*_bkp
+*.swp
+old/
+api_token
+.sav

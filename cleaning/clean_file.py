@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import csv, datetime, urllib, simplejson, requests
+import csv, datetime, urllib, simplejson
 
 def Inflation(y, rates):
 
@@ -10,23 +10,6 @@ def Inflation(y, rates):
         y += 1
 
     return rate
-
-def BestMatch(json):
-
-#    print json
-
-    try:
-        bm = json['result'][0]
-        url = "https://api.opencorporates.com" + bm['id']
-
-        match = simplejson.load(urllib.urlopen(url))
-        
-        return match['results']['company']['name'], match['results']['company']['jurisdiction_code'], match['results']['company']['company_number']
-
-    except IndexError:
-        return "nomatch","nomatch","nomatch"
-        
-
 
 # calculate inflation rate per 1 pesos (dec 2015), source: https://www.statbureau.org/en/mexico/inflation-tables
 
@@ -40,52 +23,56 @@ inflation = {}
 for year in xrange(2001,2016):
     inflation[year] = Inflation(year, yoy)
 
-#input file
-inputfile = open("../pemextest.csv")
+# input file
+inputfile = open("../pemex.csv")
 pemex = csv.reader(inputfile)
 
-suppliers = {}
+# read reconciled data
+
+newdata = []
+newrow = []
 
 pemex.next()
 for row in pemex:
 
+    aid = row[0]
+
     # fix inflation
-    awardyear = int((row[5]).split('/')[2])
+    awarddate = row[5].split('/')
+    ayear = int(awarddate[2])
+    amonth = int(awarddate[1])
+    aday = int(awarddate[0])
+    
     currency = row[7]
 
-    pesos = round((float(row[8]) * inflation[awardyear]),3)
+    pesos = round((float(row[8]) * inflation[ayear]),3)
 
     if currency == "DOLAR":
         pesos = pesos * float(row[9])
+
+    # procedure
+    if row[2] == 'OTROS' and row[3] != '':
+        proc = row[3]
+    else:
+        proc = row[2]
 
     # fix double entries -- need to check with the source!
 
     # fix multiple companies per row
 
-    #
-    # clean company strings
-    #
-
-        # reconcile API, example: http://onlinejournalismblog.com/tag/opencorporates/
-
     sname = row[4]
 
-    try:
-        cname = suppliers[sname]['name']
-        country = suppliers[sname]['country']
-        id = suppliers[sname]['id']
-            
-    except KeyError:
+    newrow.extend([aid, ayear, amonth, aday, proc, sname, pesos, row[12], row[13], row[14], int(row[14])-int(row[13])])
+    print newrow
+    newdata.append(newrow)
+    newrow = []
 
-        url = "https://opencorporates.com/reconcile/?query="+urllib.quote(sname)
-        entities = simplejson.load(urllib.urlopen(url))
-        cname, country, id = BestMatch(entities)
+with open("outputfile.csv","w") as outputfile:
+    writer = csv.writer(outputfile)
+    header = ["award ID", "award year", "award month", "award day", "procedure", "original company name", "pesos", "ammendments", "contract begin", "contract end", "contract duration"]
+    writer.writerow(header)
 
-        suppliers[sname] = {}
-        suppliers[sname]['name'] = cname
-        suppliers[sname]['country'] = country
-        suppliers[sname]['id'] = id
-
-    print awardyear,sname, cname, country, id
+    writer.writerows(newdata)
+    
             
            
